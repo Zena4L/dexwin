@@ -52,9 +52,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return exceptionResponse(HttpStatus.UNAUTHORIZED, e.getMessage());
     }
 
-    @ExceptionHandler({DuplicateEmailException.class})
+    @ExceptionHandler({DuplicateEmailException.class, BadRequestException.class})
     public ResponseEntity<Object> handle400Exceptions(Exception e) {
         return exceptionResponse(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
+
+    @ExceptionHandler({NotFoundException.class})
+    public ResponseEntity<Object> handle404Exceptions(Exception e) {
+        return exceptionResponse(HttpStatus.NOT_FOUND, e.getMessage());
     }
 
     private ResponseEntity<Object> exceptionResponse(HttpStatus status, String details) {

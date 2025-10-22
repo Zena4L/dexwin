@@ -1,20 +1,27 @@
 package com.clement.dexwin.domain.services.implementations;
 
+import com.clement.dexwin.domain.dtos.LoginRequestDto;
 import com.clement.dexwin.domain.dtos.SignedUpSucessResponse;
+import com.clement.dexwin.domain.dtos.signinResponse;
 import com.clement.dexwin.domain.dtos.SignupRequestDto;
 import com.clement.dexwin.domain.models.Roles;
 import com.clement.dexwin.domain.models.User;
 import com.clement.dexwin.domain.repository.UserRepository;
 import com.clement.dexwin.domain.security.JwtService;
+import com.clement.dexwin.domain.security.SecurityUser;
 import com.clement.dexwin.domain.services.contracts.AuthService;
 import com.clement.dexwin.exceptions.DuplicateEmailException;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
@@ -32,6 +39,7 @@ public class AuthServiceImpl implements AuthService {
     private final UserRepository userRepository;
 
     @Override
+    @Transactional
     public SignedUpSucessResponse register(SignupRequestDto request) {
 
         try {
@@ -54,6 +62,7 @@ public class AuthServiceImpl implements AuthService {
 
             String token = jwtService.generateToken(user);
 
+            userRepository.save(user);
             return SignedUpSucessResponse.builder()
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
@@ -70,5 +79,25 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void logout() {
         SecurityContextHolder.clearContext();
+    }
+
+    @Override
+    public signinResponse login(LoginRequestDto request) {
+        Authentication authenticate = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(request.email(), request.password()));
+
+        SecurityUser securityUser = (SecurityUser) authenticate.getPrincipal();
+        User user = securityUser.user();
+        if (!user.isActive()) {
+            throw new AuthenticationCredentialsNotFoundException("User is not verified");
+        }
+        String token = jwtService.generateToken(user);
+
+        return signinResponse.builder()
+            .firstName(user.getFirstName())
+            .lastName(user.getLastName())
+            .email(user.getEmail())
+            .role(user.getRoles())
+            .token(token)
+            .build();
     }
 }

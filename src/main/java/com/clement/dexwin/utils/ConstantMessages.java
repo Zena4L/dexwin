@@ -14,5 +14,9 @@ public final class ConstantMessages {
     public static final int PASSWORD_MAX_LENGTH = 32;
     public static final String DUPLICATE_EMAIL_MSG = "This Email is already exists";
 
+    public static final String DEFAULT_PAGE_NUMBER = "0";
+    public static final String DEFAULT_PAGE_SIZE = "10";
+    public static final String INVALID_PAGE_NUMBER = "Page number can't be negative";
+
 
 }

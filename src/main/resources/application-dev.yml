@@ -3,3 +3,6 @@ logging:
     root: info
     org.springframework.web: debug
     org.springframework.security: info
+spring:
+  jpa:
+    show-sql: true

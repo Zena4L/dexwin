@@ -1,5 +1,6 @@
 package com.clement.dexwin.config;
 
+import com.clement.dexwin.domain.models.Roles;
 import com.clement.dexwin.domain.security.JwtAuthenticationEntryPoint;
 import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.JWKSet;
@@ -30,6 +31,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.cors.CorsConfiguration;
 
 import java.util.List;
+
+import static org.springframework.security.oauth2.core.authorization.OAuth2AuthorizationManagers.hasScope;
 
 @Component
 @EnableWebSecurity
@@ -64,6 +67,7 @@ public class SecurityConfig {
         http.authorizeHttpRequests(auth -> auth.requestMatchers("/error").permitAll()
             .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/v1/signup", "/api/v1/login").permitAll()
+            .requestMatchers("/api/v1/users/**").access(hasScope(Roles.ADMIN.name()))
             .anyRequest().authenticated()
         );
         http.sessionManagement(session ->
