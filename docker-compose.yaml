@@ -4,7 +4,7 @@ services:
 
   dexwin-postgres:
     image: pgvector/pgvector:pg16
-    container_name: dt-postgres
+    container_name: dexwin-postgres
     ports:
       - "5432:5432"
     environment:
