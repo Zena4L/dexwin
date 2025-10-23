@@ -39,7 +39,6 @@ import java.util.UUID;
 @Getter
 @Setter
 @EntityListeners(AuditingEntityListener.class)
-@SoftDelete(columnName = "deleted")
 @NamedEntityGraph(
         name = "with.users",
         attributeNodes = {
