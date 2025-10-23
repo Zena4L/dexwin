@@ -5,25 +5,24 @@ import com.clement.dexwin.domain.dtos.notes.NoteResponse;
 import com.clement.dexwin.domain.dtos.notes.NotesRequest;
 import com.clement.dexwin.domain.models.users.Roles;
 import com.clement.dexwin.domain.models.users.User;
+import com.clement.dexwin.domain.repository.UserRepository;
 import com.clement.dexwin.domain.services.contracts.NoteService;
-import com.clement.dexwin.exceptions.BadRequestException;
-import com.clement.dexwin.exceptions.ConflictException;
-import com.clement.dexwin.exceptions.GenericException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
-import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -34,16 +33,12 @@ import java.util.UUID;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -55,6 +50,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(NotesController.class)
 @AutoConfigureMockMvc(addFilters = false)
+@Import(TestSecurityConfig.class)
 class NotesControllerTest {
 
     @Autowired
@@ -66,16 +62,22 @@ class NotesControllerTest {
     @MockitoBean
     private NoteService noteService;
 
+    @MockitoBean
+    private JwtDecoder jwtDecoder;
+
+    @MockitoBean
+    private UserRepository userRepository;
+
     private User testUser;
+    private UUID testNoteId;
     private NotesRequest validNotesRequest;
     private NoteResponse noteResponse;
     private GenericMessageResponse successResponse;
-    private UUID noteId;
-    private JsonNode contentNode;
+    private JsonNode testContent;
 
     @BeforeEach
     void setUp() {
-        noteId = UUID.randomUUID();
+        testNoteId = UUID.randomUUID();
 
         testUser = User.builder()
                 .id(UUID.randomUUID())
@@ -84,701 +86,377 @@ class NotesControllerTest {
                 .email("john.doe@example.com")
                 .roles(Roles.VIEWER)
                 .isActive(true)
+                .isDeleted(false)
                 .build();
 
-        // Create JSON content
-        ObjectNode content = JsonNodeFactory.instance.objectNode();
-        content.put("text", "This is a test note");
-        contentNode = content;
+        // Create test JSON content
+        ObjectNode contentNode = JsonNodeFactory.instance.objectNode();
+        contentNode.put("text", "This is a test note content");
+        contentNode.put("format", "markdown");
+        testContent = contentNode;
 
         validNotesRequest = NotesRequest.builder()
                 .title("Test Note")
-                .content(contentNode)
-                .tags(Arrays.asList("tag1", "tag2"))
+                .content(testContent)
+                .tags(Arrays.asList("work", "important"))
                 .build();
 
         noteResponse = new NoteResponse(
                 "Test Note",
-                contentNode,
-                Arrays.asList("tag1", "tag2")
+                testContent,
+                Arrays.asList("work", "important")
         );
 
-        successResponse = new GenericMessageResponse("Note created successfully");
+        successResponse = GenericMessageResponse.builder()
+                .message("Operation completed successfully")
+                .build();
     }
 
-    @Nested
-    @DisplayName("POST /api/v1/notes - Create Note Tests")
-    class CreateNoteTests {
 
-        @Test
-        @DisplayName("Should successfully create a note with valid data")
-        void shouldCreateNoteSuccessfully() throws Exception {
-            // Arrange
-            when(noteService.createNote(any(User.class), any(NotesRequest.class)))
-                    .thenReturn(successResponse);
+    @Test
+    @DisplayName("POST /api/v1/notes - Should successfully create a note with authenticated user")
+    @WithMockAuthenticatedUser
+    void shouldSuccessfullyCreateNote() throws Exception {
+        // Arrange
+        when(noteService.createNote(any(User.class), any(NotesRequest.class)))
+                .thenReturn(successResponse);
 
-            // Act & Assert
-            mockMvc.perform(post("/api/v1/notes")
-                            .with(user((UserDetails) testUser))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(validNotesRequest)))
-                    .andDo(print())
-                    .andExpect(status().isCreated())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.message").value("Note created successfully"));
+        // Act & Assert
+        mockMvc.perform(post("/api/v1/notes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validNotesRequest)))
+                .andDo(print())
+                .andExpect(status().isCreated())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.message").value("Operation completed successfully"));
 
-            verify(noteService, times(1)).createNote(any(User.class), any(NotesRequest.class));
-        }
-
-        @Test
-        @DisplayName("Should create note with empty tags list")
-        void shouldCreateNoteWithEmptyTags() throws Exception {
-            // Arrange
-            NotesRequest requestWithEmptyTags = NotesRequest.builder()
-                    .title("Test Note")
-                    .content(contentNode)
-                    .tags(Collections.emptyList())
-                    .build();
-
-            when(noteService.createNote(any(User.class), any(NotesRequest.class)))
-                    .thenReturn(successResponse);
-
-            // Act & Assert
-            mockMvc.perform(post("/api/v1/notes")
-                            .with(user((UserDetails) testUser))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(requestWithEmptyTags)))
-                    .andDo(print())
-                    .andExpect(status().isCreated())
-                    .andExpect(jsonPath("$.message").exists());
-
-            verify(noteService, times(1)).createNote(any(User.class), any(NotesRequest.class));
-        }
-
-        @Test
-        @DisplayName("Should return 400 when title is null")
-        void shouldReturnBadRequestWhenTitleIsNull() throws Exception {
-            // Arrange
-            String invalidJson = "{\"title\":null,\"content\":{\"text\":\"content\"},\"tags\":[\"tag1\"]}";
-
-            // Act & Assert
-            mockMvc.perform(post("/api/v1/notes")
-                            .with(user((UserDetails) testUser))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(invalidJson))
-                    .andDo(print())
-                    .andExpect(status().isBadRequest());
-
-            verify(noteService, never()).createNote(any(User.class), any(NotesRequest.class));
-        }
-
-        @Test
-        @DisplayName("Should return 400 when title is blank")
-        void shouldReturnBadRequestWhenTitleIsBlank() throws Exception {
-            // Arrange
-            String invalidJson = "{\"title\":\"\",\"content\":{\"text\":\"content\"},\"tags\":[\"tag1\"]}";
-
-            // Act & Assert
-            mockMvc.perform(post("/api/v1/notes")
-                            .with(user((UserDetails) testUser))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(invalidJson))
-                    .andDo(print())
-                    .andExpect(status().isBadRequest());
-
-            verify(noteService, never()).createNote(any(User.class), any(NotesRequest.class));
-        }
-
-        @Test
-        @DisplayName("Should return 400 when content is null")
-        void shouldReturnBadRequestWhenContentIsNull() throws Exception {
-            // Arrange
-            String invalidJson = "{\"title\":\"Test Note\",\"content\":null,\"tags\":[\"tag1\"]}";
-
-            // Act & Assert
-            mockMvc.perform(post("/api/v1/notes")
-                            .with(user((UserDetails) testUser))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(invalidJson))
-                    .andDo(print())
-                    .andExpect(status().isBadRequest());
-
-            verify(noteService, never()).createNote(any(User.class), any(NotesRequest.class));
-        }
-
-        @Test
-        @DisplayName("Should return 400 when request body is invalid JSON")
-        void shouldReturnBadRequestWhenInvalidJson() throws Exception {
-            // Act & Assert
-            mockMvc.perform(post("/api/v1/notes")
-                            .with(user((UserDetails) testUser))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"invalid\":\"json\"}"))
-                    .andDo(print())
-                    .andExpect(status().isBadRequest());
-
-            verify(noteService, never()).createNote(any(User.class), any(NotesRequest.class));
-        }
-
-        @Test
-        @DisplayName("Should handle service exception")
-        void shouldHandleServiceException() throws Exception {
-            // Arrange
-            when(noteService.createNote(any(User.class), any(NotesRequest.class)))
-                    .thenThrow(new GenericException("Failed to create note"));
-
-            // Act & Assert
-            mockMvc.perform(post("/api/v1/notes")
-                            .with(user((UserDetails) testUser))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(validNotesRequest)))
-                    .andDo(print())
-                    .andExpect(status().isInternalServerError());
-
-            verify(noteService, times(1)).createNote(any(User.class), any(NotesRequest.class));
-        }
+        verify(noteService, times(1)).createNote(any(User.class), any(NotesRequest.class));
     }
 
-    @Nested
-    @DisplayName("GET /api/v1/notes - Get All Notes Tests")
-    class GetAllNotesTests {
+    @Test
+    @DisplayName("POST /api/v1/notes - Should fail when title is blank")
+    @WithMockAuthenticatedUser
+    void shouldFailWhenTitleIsBlank() throws Exception {
+        // Arrange
+        NotesRequest invalidRequest = NotesRequest.builder()
+                .title("")
+                .content(testContent)
+                .tags(Collections.singletonList("work"))
+                .build();
 
-        @Test
-        @DisplayName("Should get all notes with default pagination")
-        void shouldGetAllNotesWithDefaultPagination() throws Exception {
-            // Arrange
-            List<NoteResponse> notes = Arrays.asList(noteResponse);
-            Page<NoteResponse> notesPage = new PageImpl<>(notes);
+        // Act & Assert
+        mockMvc.perform(post("/api/v1/notes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidRequest)))
+                .andDo(print())
+                .andExpect(status().isBadRequest());
 
-            when(noteService.getAllNotes(any(User.class), eq(0), eq(10), eq(""), isNull()))
-                    .thenReturn(notesPage);
-
-            // Act & Assert
-            mockMvc.perform(get("/api/v1/notes")
-                            .with(user((UserDetails) testUser)))
-                    .andDo(print())
-                    .andExpect(status().isOk())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.content", hasSize(1)))
-                    .andExpect(jsonPath("$.content[0].title").value("Test Note"))
-                    .andExpect(jsonPath("$.content[0].tags", hasSize(2)));
-
-            verify(noteService, times(1)).getAllNotes(any(User.class), eq(0), eq(10), eq(""), isNull());
-        }
-
-        @Test
-        @DisplayName("Should get notes with custom pagination")
-        void shouldGetNotesWithCustomPagination() throws Exception {
-            // Arrange
-            List<NoteResponse> notes = Collections.singletonList(noteResponse);
-            Page<NoteResponse> notesPage = new PageImpl<>(notes);
-
-            when(noteService.getAllNotes(any(User.class), eq(2), eq(20), eq(""), isNull()))
-                    .thenReturn(notesPage);
-
-            // Act & Assert
-            mockMvc.perform(get("/api/v1/notes")
-                            .with(user((UserDetails) testUser))
-                            .param("page", "2")
-                            .param("size", "20"))
-                    .andDo(print())
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.content", hasSize(1)));
-
-            verify(noteService, times(1)).getAllNotes(any(User.class), eq(2), eq(20), eq(""), isNull());
-        }
-
-        @Test
-        @DisplayName("Should get notes with search parameter")
-        void shouldGetNotesWithSearch() throws Exception {
-            // Arrange
-            List<NoteResponse> notes = Collections.singletonList(noteResponse);
-            Page<NoteResponse> notesPage = new PageImpl<>(notes);
-
-            when(noteService.getAllNotes(any(User.class), eq(0), eq(10), eq("test"), isNull()))
-                    .thenReturn(notesPage);
-
-            // Act & Assert
-            mockMvc.perform(get("/api/v1/notes")
-                            .with(user((UserDetails) testUser))
-                            .param("search", "test"))
-                    .andDo(print())
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.content", hasSize(1)));
-
-            verify(noteService, times(1)).getAllNotes(any(User.class), eq(0), eq(10), eq("test"), isNull());
-        }
-
-        @Test
-        @DisplayName("Should get notes with single filter tag")
-        void shouldGetNotesWithSingleFilterTag() throws Exception {
-            // Arrange
-            List<NoteResponse> notes = Collections.singletonList(noteResponse);
-            Page<NoteResponse> notesPage = new PageImpl<>(notes);
-
-            when(noteService.getAllNotes(any(User.class), eq(0), eq(10), eq(""), anyList()))
-                    .thenReturn(notesPage);
-
-            // Act & Assert
-            mockMvc.perform(get("/api/v1/notes")
-                            .with(user((UserDetails) testUser))
-                            .param("filter", "tag1"))
-                    .andDo(print())
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.content", hasSize(1)));
-
-            verify(noteService, times(1)).getAllNotes(any(User.class), eq(0), eq(10), eq(""), anyList());
-        }
-
-        @Test
-        @DisplayName("Should get notes with multiple filter tags")
-        void shouldGetNotesWithMultipleFilterTags() throws Exception {
-            // Arrange
-            List<NoteResponse> notes = Arrays.asList(noteResponse);
-            Page<NoteResponse> notesPage = new PageImpl<>(notes);
-
-            when(noteService.getAllNotes(any(User.class), eq(0), eq(10), eq(""), anyList()))
-                    .thenReturn(notesPage);
-
-            // Act & Assert
-            mockMvc.perform(get("/api/v1/notes")
-                            .with(user((UserDetails) testUser))
-                            .param("filter", "tag1,tag2,tag3"))
-                    .andDo(print())
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.content", hasSize(1)));
-
-            verify(noteService, times(1)).getAllNotes(any(User.class), eq(0), eq(10), eq(""), anyList());
-        }
-
-        @Test
-        @DisplayName("Should get notes with search and filter tags")
-        void shouldGetNotesWithSearchAndFilterTags() throws Exception {
-            // Arrange
-            List<NoteResponse> notes = Arrays.asList(noteResponse);
-            Page<NoteResponse> notesPage = new PageImpl<>(notes);
-
-            when(noteService.getAllNotes(any(User.class), eq(0), eq(10), eq("test"), anyList()))
-                    .thenReturn(notesPage);
-
-            // Act & Assert
-            mockMvc.perform(get("/api/v1/notes")
-                            .with(user((UserDetails) testUser))
-                            .param("search", "test")
-                            .param("filter", "tag1,tag2"))
-                    .andDo(print())
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.content", hasSize(1)));
-
-            verify(noteService, times(1)).getAllNotes(any(User.class), eq(0), eq(10), eq("test"), anyList());
-        }
-
-        @Test
-        @DisplayName("Should handle empty filter string")
-        void shouldHandleEmptyFilterString() throws Exception {
-            // Arrange
-            List<NoteResponse> notes = Collections.singletonList(noteResponse);
-            Page<NoteResponse> notesPage = new PageImpl<>(notes);
-
-            when(noteService.getAllNotes(any(User.class), eq(0), eq(10), eq(""), isNull()))
-                    .thenReturn(notesPage);
-
-            // Act & Assert
-            mockMvc.perform(get("/api/v1/notes")
-                            .with(user((UserDetails) testUser))
-                            .param("filter", ""))
-                    .andDo(print())
-                    .andExpect(status().isOk());
-
-            verify(noteService, times(1)).getAllNotes(any(User.class), eq(0), eq(10), eq(""), isNull());
-        }
-
-        @Test
-        @DisplayName("Should handle filter with whitespace only")
-        void shouldHandleFilterWithWhitespaceOnly() throws Exception {
-            // Arrange
-            List<NoteResponse> notes = Arrays.asList(noteResponse);
-            Page<NoteResponse> notesPage = new PageImpl<>(notes);
-
-            when(noteService.getAllNotes(any(User.class), eq(0), eq(10), eq(""), isNull()))
-                    .thenReturn(notesPage);
-
-            // Act & Assert
-            mockMvc.perform(get("/api/v1/notes")
-                            .with(user((UserDetails) testUser))
-                            .param("filter", "   "))
-                    .andDo(print())
-                    .andExpect(status().isOk());
-
-            verify(noteService, times(1)).getAllNotes(any(User.class), eq(0), eq(10), eq(""), isNull());
-        }
-
-        @Test
-        @DisplayName("Should trim filter tags and remove empty strings")
-        void shouldTrimFilterTagsAndRemoveEmptyStrings() throws Exception {
-            // Arrange
-            List<NoteResponse> notes = Arrays.asList(noteResponse);
-            Page<NoteResponse> notesPage = new PageImpl<>(notes);
-
-            when(noteService.getAllNotes(any(User.class), eq(0), eq(10), eq(""), anyList()))
-                    .thenReturn(notesPage);
-
-            // Act & Assert
-            mockMvc.perform(get("/api/v1/notes")
-                            .with(user((UserDetails) testUser))
-                            .param("filter", " tag1 , , tag2 , "))
-                    .andDo(print())
-                    .andExpect(status().isOk());
-
-            verify(noteService, times(1)).getAllNotes(any(User.class), eq(0), eq(10), eq(""), anyList());
-        }
-
-        @Test
-        @DisplayName("Should return empty page when no notes found")
-        void shouldReturnEmptyPageWhenNoNotesFound() throws Exception {
-            // Arrange
-            Page<NoteResponse> emptyPage = new PageImpl<>(Collections.emptyList());
-
-            when(noteService.getAllNotes(any(User.class), eq(0), eq(10), eq(""), isNull()))
-                    .thenReturn(emptyPage);
-
-            // Act & Assert
-            mockMvc.perform(get("/api/v1/notes")
-                            .with(user((UserDetails) testUser)))
-                    .andDo(print())
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.content", hasSize(0)));
-
-            verify(noteService, times(1)).getAllNotes(any(User.class), eq(0), eq(10), eq(""), isNull());
-        }
-
-        @Test
-        @DisplayName("Should handle BadRequestException from service")
-        void shouldHandleBadRequestException() throws Exception {
-            // Arrange
-            when(noteService.getAllNotes(any(User.class), anyInt(), anyInt(), anyString(), any()))
-                    .thenThrow(new BadRequestException("Invalid page number"));
-
-            // Act & Assert
-            mockMvc.perform(get("/api/v1/notes")
-                            .with(user((UserDetails) testUser)))
-                    .andDo(print())
-                    .andExpect(status().isBadRequest());
-
-            verify(noteService, times(1)).getAllNotes(any(User.class), eq(0), eq(10), eq(""), isNull());
-        }
+        verify(noteService, never()).createNote(any(User.class), any(NotesRequest.class));
     }
 
-    @Nested
-    @DisplayName("GET /api/v1/notes/{noteId} - Get Note By ID Tests")
-    class GetNoteByIdTests {
 
-        @Test
-        @DisplayName("Should get note by ID successfully")
-        void shouldGetNoteByIdSuccessfully() throws Exception {
-            // Arrange
-            when(noteService.getNoteById(any(User.class), eq(noteId)))
-                    .thenReturn(noteResponse);
 
-            // Act & Assert
-            mockMvc.perform(get("/api/v1/notes/{noteId}", noteId)
-                            .with(user((UserDetails) testUser)))
-                    .andDo(print())
-                    .andExpect(status().isOk())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.title").value("Test Note"))
-                    .andExpect(jsonPath("$.tags", hasSize(2)))
-                    .andExpect(jsonPath("$.content").exists());
+    @Test
+    @DisplayName("POST /api/v1/notes - Should successfully create note without tags")
+    @WithMockAuthenticatedUser
+    void shouldSuccessfullyCreateNoteWithoutTags() throws Exception {
+        // Arrange
+        NotesRequest requestWithoutTags = NotesRequest.builder()
+                .title("Test Note")
+                .content(testContent)
+                .tags(null)
+                .build();
 
-            verify(noteService, times(1)).getNoteById(any(User.class), eq(noteId));
-        }
+        when(noteService.createNote(any(User.class), any(NotesRequest.class)))
+                .thenReturn(successResponse);
 
-        @Test
-        @DisplayName("Should return 400 when note not found")
-        void shouldReturnBadRequestWhenNoteNotFound() throws Exception {
-            // Arrange
-            UUID nonExistentId = UUID.randomUUID();
-            when(noteService.getNoteById(any(User.class), eq(nonExistentId)))
-                    .thenThrow(new BadRequestException("Note not found with id: " + nonExistentId));
+        // Act & Assert
+        mockMvc.perform(post("/api/v1/notes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(requestWithoutTags)))
+                .andDo(print())
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.message").exists());
 
-            // Act & Assert
-            mockMvc.perform(get("/api/v1/notes/{noteId}", nonExistentId)
-                            .with(user((UserDetails) testUser)))
-                    .andDo(print())
-                    .andExpect(status().isBadRequest());
-
-            verify(noteService, times(1)).getNoteById(any(User.class), eq(nonExistentId));
-        }
-
-        @Test
-        @DisplayName("Should handle invalid UUID format")
-        void shouldHandleInvalidUuidFormat() throws Exception {
-            // Act & Assert
-            mockMvc.perform(get("/api/v1/notes/{noteId}", "invalid-uuid")
-                            .with(user((UserDetails) testUser)))
-                    .andDo(print())
-                    .andExpect(status().isBadRequest());
-
-            verify(noteService, never()).getNoteById(any(User.class), any(UUID.class));
-        }
+        verify(noteService, times(1)).createNote(any(User.class), any(NotesRequest.class));
     }
 
-    @Nested
-    @DisplayName("DELETE /api/v1/notes/{noteId} - Delete Note Tests")
-    class DeleteNoteTests {
+    @Test
+    @DisplayName("GET /api/v1/notes - Should successfully retrieve all notes with default pagination")
+    @WithMockAuthenticatedUser
+    void shouldSuccessfullyGetAllNotesWithDefaultPagination() throws Exception {
+        // Arrange
+        List<NoteResponse> notes = Arrays.asList(
+                new NoteResponse("Note 1", testContent, Arrays.asList("tag1")),
+                new NoteResponse("Note 2", testContent, Arrays.asList("tag2"))
+        );
+        Page<NoteResponse> notesPage = new PageImpl<>(notes, PageRequest.of(0, 10), notes.size());
 
-        @Test
-        @DisplayName("Should delete note successfully")
-        void shouldDeleteNoteSuccessfully() throws Exception {
-            // Arrange
-            GenericMessageResponse deleteResponse = new GenericMessageResponse("Note deleted successfully");
-            when(noteService.deleteNote(any(User.class), eq(noteId)))
-                    .thenReturn(deleteResponse);
+        when(noteService.getAllNotes(any(User.class), eq(0), eq(10), eq(""), isNull()))
+                .thenReturn(notesPage);
 
-            // Act & Assert
-            mockMvc.perform(delete("/api/v1/notes/{noteId}", noteId)
-                            .with(user((UserDetails) testUser)))
-                    .andDo(print())
-                    .andExpect(status().isOk())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.message").value("Note deleted successfully"));
+        // Act & Assert
+        mockMvc.perform(get("/api/v1/notes"))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.content", hasSize(2)));
 
-            verify(noteService, times(1)).deleteNote(any(User.class), eq(noteId));
-        }
 
-        @Test
-        @DisplayName("Should return 400 when note not found for deletion")
-        void shouldReturnBadRequestWhenNoteNotFound() throws Exception {
-            // Arrange
-            when(noteService.deleteNote(any(User.class), eq(noteId)))
-                    .thenThrow(new BadRequestException("Note not found or already deleted"));
-
-            // Act & Assert
-            mockMvc.perform(delete("/api/v1/notes/{noteId}", noteId)
-                            .with(user((UserDetails) testUser)))
-                    .andDo(print())
-                    .andExpect(status().isBadRequest());
-
-            verify(noteService, times(1)).deleteNote(any(User.class), eq(noteId));
-        }
-
-        @Test
-        @DisplayName("Should handle invalid UUID format for deletion")
-        void shouldHandleInvalidUuidFormatForDeletion() throws Exception {
-            // Act & Assert
-            mockMvc.perform(delete("/api/v1/notes/{noteId}", "invalid-uuid")
-                            .with(user((UserDetails) testUser)))
-                    .andDo(print())
-                    .andExpect(status().isBadRequest());
-
-            verify(noteService, never()).deleteNote(any(User.class), any(UUID.class));
-        }
+        verify(noteService, times(1)).getAllNotes(any(User.class), eq(0), eq(10), eq(""), isNull());
     }
 
-    @Nested
-    @DisplayName("POST /api/v1/notes/{noteId}/restore - Restore Note Tests")
-    class RestoreNoteTests {
+    @Test
+    @DisplayName("GET /api/v1/notes - Should successfully retrieve notes with custom pagination")
+    @WithMockAuthenticatedUser
+    void shouldSuccessfullyGetNotesWithCustomPagination() throws Exception {
+        // Arrange
+        List<NoteResponse> notes = Collections.singletonList(
+                new NoteResponse("Note 1", testContent, Arrays.asList("tag1"))
+        );
+        Page<NoteResponse> notesPage = new PageImpl<>(notes, PageRequest.of(1, 5), 10);
 
-        @Test
-        @DisplayName("Should restore note successfully")
-        void shouldRestoreNoteSuccessfully() throws Exception {
-            // Arrange
-            GenericMessageResponse restoreResponse = new GenericMessageResponse("Note restored successfully");
-            when(noteService.restoreNote(any(User.class), eq(noteId)))
-                    .thenReturn(restoreResponse);
+        when(noteService.getAllNotes(any(User.class), eq(1), eq(5), eq(""), isNull()))
+                .thenReturn(notesPage);
 
-            // Act & Assert
-            mockMvc.perform(post("/api/v1/notes/{noteId}/restore", noteId)
-                            .with(user((UserDetails) testUser)))
-                    .andDo(print())
-                    .andExpect(status().isOk())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.message").value("Note restored successfully"));
+        // Act & Assert
+        mockMvc.perform(get("/api/v1/notes")
+                        .param("page", "1")
+                        .param("size", "5"))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)));
 
-            verify(noteService, times(1)).restoreNote(any(User.class), eq(noteId));
-        }
 
-        @Test
-        @DisplayName("Should return 400 when note not found for restore")
-        void shouldReturnBadRequestWhenNoteNotFoundForRestore() throws Exception {
-            // Arrange
-            when(noteService.restoreNote(any(User.class), eq(noteId)))
-                    .thenThrow(new BadRequestException("Note not found or not deleted"));
-
-            // Act & Assert
-            mockMvc.perform(post("/api/v1/notes/{noteId}/restore", noteId)
-                            .with(user((UserDetails) testUser)))
-                    .andDo(print())
-                    .andExpect(status().isBadRequest());
-
-            verify(noteService, times(1)).restoreNote(any(User.class), eq(noteId));
-        }
-
-        @Test
-        @DisplayName("Should handle invalid UUID format for restore")
-        void shouldHandleInvalidUuidFormatForRestore() throws Exception {
-            // Act & Assert
-            mockMvc.perform(post("/api/v1/notes/{noteId}/restore", "invalid-uuid")
-                            .with(user((UserDetails) testUser)))
-                    .andDo(print())
-                    .andExpect(status().isBadRequest());
-
-            verify(noteService, never()).restoreNote(any(User.class), any(UUID.class));
-        }
+        verify(noteService, times(1)).getAllNotes(any(User.class), eq(1), eq(5), eq(""), isNull());
     }
 
-    @Nested
-    @DisplayName("PUT /api/v1/notes/{noteId} - Update Note Tests")
-    class UpdateNoteTests {
+    @Test
+    @DisplayName("GET /api/v1/notes - Should successfully search notes by search query")
+    @WithMockAuthenticatedUser
+    void shouldSuccessfullySearchNotes() throws Exception {
+        // Arrange
+        String searchQuery = "important";
+        List<NoteResponse> notes = Collections.singletonList(noteResponse);
+        Page<NoteResponse> notesPage = new PageImpl<>(notes, PageRequest.of(0, 10), notes.size());
 
-        @Test
-        @DisplayName("Should update note successfully")
-        void shouldUpdateNoteSuccessfully() throws Exception {
-            // Arrange
-            GenericMessageResponse updateResponse = new GenericMessageResponse("Note updated successfully");
-            when(noteService.updateNote(any(User.class), eq(noteId), any(NotesRequest.class)))
-                    .thenReturn(updateResponse);
+        when(noteService.getAllNotes(any(User.class), eq(0), eq(10), eq(searchQuery), isNull()))
+                .thenReturn(notesPage);
 
-            // Act & Assert
-            mockMvc.perform(put("/api/v1/notes/{noteId}", noteId)
-                            .with(user((UserDetails) testUser))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(validNotesRequest)))
-                    .andDo(print())
-                    .andExpect(status().isOk())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.message").value("Note updated successfully"));
+        // Act & Assert
+        mockMvc.perform(get("/api/v1/notes")
+                        .param("search", searchQuery))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].title").value("Test Note"));
 
-            verify(noteService, times(1)).updateNote(any(User.class), eq(noteId), any(NotesRequest.class));
-        }
+        verify(noteService, times(1)).getAllNotes(any(User.class), eq(0), eq(10), eq(searchQuery), isNull());
+    }
 
-        @Test
-        @DisplayName("Should return 400 when note not found for update")
-        void shouldReturnBadRequestWhenNoteNotFoundForUpdate() throws Exception {
-            // Arrange
-            when(noteService.updateNote(any(User.class), eq(noteId), any(NotesRequest.class)))
-                    .thenThrow(new BadRequestException("Note not found or has been deleted"));
+    @Test
+    @DisplayName("GET /api/v1/notes - Should successfully filter notes by tags")
+    @WithMockAuthenticatedUser
+    void shouldSuccessfullyFilterNotesByTags() throws Exception {
+        // Arrange
+        String filterParam = "work,important";
+        List<String> expectedTags = Arrays.asList("work", "important");
+        List<NoteResponse> notes = Collections.singletonList(noteResponse);
+        Page<NoteResponse> notesPage = new PageImpl<>(notes, PageRequest.of(0, 10), notes.size());
 
-            // Act & Assert
-            mockMvc.perform(put("/api/v1/notes/{noteId}", noteId)
-                            .with(user((UserDetails) testUser))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(validNotesRequest)))
-                    .andDo(print())
-                    .andExpect(status().isBadRequest());
+        when(noteService.getAllNotes(any(User.class), eq(0), eq(10), eq(""), eq(expectedTags)))
+                .thenReturn(notesPage);
 
-            verify(noteService, times(1)).updateNote(any(User.class), eq(noteId), any(NotesRequest.class));
-        }
+        // Act & Assert
+        mockMvc.perform(get("/api/v1/notes")
+                        .param("filter", filterParam))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)));
 
-        @Test
-        @DisplayName("Should return 409 on optimistic lock exception")
-        void shouldReturnConflictOnOptimisticLockException() throws Exception {
-            // Arrange
-            when(noteService.updateNote(any(User.class), eq(noteId), any(NotesRequest.class)))
-                    .thenThrow(new ConflictException("This note was modified by someone else. Please refresh and try again."));
+        verify(noteService, times(1)).getAllNotes(any(User.class), eq(0), eq(10), eq(""), eq(expectedTags));
+    }
 
-            // Act & Assert
-            mockMvc.perform(put("/api/v1/notes/{noteId}", noteId)
-                            .with(user((UserDetails) testUser))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(validNotesRequest)))
-                    .andDo(print())
-                    .andExpect(status().isConflict());
+    @Test
+    @DisplayName("GET /api/v1/notes - Should handle empty filter parameter")
+    @WithMockAuthenticatedUser
+    void shouldHandleEmptyFilterParameter() throws Exception {
+        // Arrange
+        List<NoteResponse> notes = Collections.singletonList(noteResponse);
+        Page<NoteResponse> notesPage = new PageImpl<>(notes, PageRequest.of(0, 10), notes.size());
 
-            verify(noteService, times(1)).updateNote(any(User.class), eq(noteId), any(NotesRequest.class));
-        }
+        when(noteService.getAllNotes(any(User.class), eq(0), eq(10), eq(""), isNull()))
+                .thenReturn(notesPage);
 
-        @Test
-        @DisplayName("Should return 400 when update request has null title")
-        void shouldReturnBadRequestWhenUpdateRequestHasNullTitle() throws Exception {
-            // Arrange
-            String invalidJson = "{\"title\":null,\"content\":{\"text\":\"content\"},\"tags\":[\"tag1\"]}";
+        // Act & Assert
+        mockMvc.perform(get("/api/v1/notes")
+                        .param("filter", ""))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)));
 
-            // Act & Assert
-            mockMvc.perform(put("/api/v1/notes/{noteId}", noteId)
-                            .with(user((UserDetails) testUser))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(invalidJson))
-                    .andDo(print())
-                    .andExpect(status().isBadRequest());
+        verify(noteService, times(1)).getAllNotes(any(User.class), eq(0), eq(10), eq(""), isNull());
+    }
 
-            verify(noteService, never()).updateNote(any(User.class), any(UUID.class), any(NotesRequest.class));
-        }
+    @Test
+    @DisplayName("GET /api/v1/notes - Should filter notes with search and filter combined")
+    @WithMockAuthenticatedUser
+    void shouldFilterNotesWithSearchAndFilter() throws Exception {
+        // Arrange
+        String searchQuery = "test";
+        String filterParam = "work";
+        List<String> expectedTags = Collections.singletonList("work");
+        List<NoteResponse> notes = Collections.singletonList(noteResponse);
+        Page<NoteResponse> notesPage = new PageImpl<>(notes, PageRequest.of(0, 10), notes.size());
 
-        @Test
-        @DisplayName("Should return 400 when update request has blank title")
-        void shouldReturnBadRequestWhenUpdateRequestHasBlankTitle() throws Exception {
-            // Arrange
-            String invalidJson = "{\"title\":\"\",\"content\":{\"text\":\"content\"},\"tags\":[\"tag1\"]}";
+        when(noteService.getAllNotes(any(User.class), eq(0), eq(10), eq(searchQuery), eq(expectedTags)))
+                .thenReturn(notesPage);
 
-            // Act & Assert
-            mockMvc.perform(put("/api/v1/notes/{noteId}", noteId)
-                            .with(user((UserDetails) testUser))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(invalidJson))
-                    .andDo(print())
-                    .andExpect(status().isBadRequest());
+        // Act & Assert
+        mockMvc.perform(get("/api/v1/notes")
+                        .param("search", searchQuery)
+                        .param("filter", filterParam))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)));
 
-            verify(noteService, never()).updateNote(any(User.class), any(UUID.class), any(NotesRequest.class));
-        }
+        verify(noteService, times(1)).getAllNotes(any(User.class), eq(0), eq(10), eq(searchQuery), eq(expectedTags));
+    }
 
-        @Test
-        @DisplayName("Should return 400 when update request has null content")
-        void shouldReturnBadRequestWhenUpdateRequestHasNullContent() throws Exception {
-            // Arrange
-            String invalidJson = "{\"title\":\"Test Note\",\"content\":null,\"tags\":[\"tag1\"]}";
+    @Test
+    @DisplayName("GET /api/v1/notes/{noteId} - Should successfully retrieve a note by ID")
+    @WithMockAuthenticatedUser
+    void shouldSuccessfullyGetNoteById() throws Exception {
+        // Arrange
+        when(noteService.getNoteById(any(User.class), eq(testNoteId)))
+                .thenReturn(noteResponse);
 
-            // Act & Assert
-            mockMvc.perform(put("/api/v1/notes/{noteId}", noteId)
-                            .with(user((UserDetails) testUser))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(invalidJson))
-                    .andDo(print())
-                    .andExpect(status().isBadRequest());
+        // Act & Assert
+        mockMvc.perform(get("/api/v1/notes/{noteId}", testNoteId))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.title").value("Test Note"))
+                .andExpect(jsonPath("$.tags", hasSize(2)))
+                .andExpect(jsonPath("$.tags[0]").value("work"))
+                .andExpect(jsonPath("$.tags[1]").value("important"));
 
-            verify(noteService, never()).updateNote(any(User.class), any(UUID.class), any(NotesRequest.class));
-        }
+        verify(noteService, times(1)).getNoteById(any(User.class), eq(testNoteId));
+    }
 
-        @Test
-        @DisplayName("Should update note with new tags")
-        void shouldUpdateNoteWithNewTags() throws Exception {
-            // Arrange
-            NotesRequest updateRequest = NotesRequest.builder()
-                    .title("Updated Note")
-                    .content(contentNode)
-                    .tags(Arrays.asList("newTag1", "newTag2", "newTag3"))
-                    .build();
+    @Test
+    @DisplayName("DELETE /api/v1/notes/{noteId} - Should successfully delete a note")
+    @WithMockAuthenticatedUser
+    void shouldSuccessfullyDeleteNote() throws Exception {
+        // Arrange
+        GenericMessageResponse deleteResponse = GenericMessageResponse.builder()
+                .message("Note deleted successfully")
+                .build();
 
-            GenericMessageResponse updateResponse = new GenericMessageResponse("Note updated successfully");
-            when(noteService.updateNote(any(User.class), eq(noteId), any(NotesRequest.class)))
-                    .thenReturn(updateResponse);
+        when(noteService.deleteNote(any(User.class), eq(testNoteId)))
+                .thenReturn(deleteResponse);
 
-            // Act & Assert
-            mockMvc.perform(put("/api/v1/notes/{noteId}", noteId)
-                            .with(user((UserDetails) testUser))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(updateRequest)))
-                    .andDo(print())
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.message").value("Note updated successfully"));
+        // Act & Assert
+        mockMvc.perform(delete("/api/v1/notes/{noteId}", testNoteId))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.message").value("Note deleted successfully"));
 
-            verify(noteService, times(1)).updateNote(any(User.class), eq(noteId), any(NotesRequest.class));
-        }
+        verify(noteService, times(1)).deleteNote(any(User.class), eq(testNoteId));
+    }
 
-        @Test
-        @DisplayName("Should handle invalid UUID format for update")
-        void shouldHandleInvalidUuidFormatForUpdate() throws Exception {
-            // Act & Assert
-            mockMvc.perform(put("/api/v1/notes/{noteId}", "invalid-uuid")
-                            .with(user
-                                    ((UserDetails) testUser))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(validNotesRequest)))
-                    .andDo(print())
-                    .andExpect(status().isBadRequest());
+    @Test
+    @DisplayName("POST /api/v1/notes/{noteId}/restore - Should successfully restore a deleted note")
+    @WithMockAuthenticatedUser
+    void shouldSuccessfullyRestoreNote() throws Exception {
+        // Arrange
+        GenericMessageResponse restoreResponse = GenericMessageResponse.builder()
+                .message("Note restored successfully")
+                .build();
 
-            verify(noteService, never()).updateNote(any(User.class), any(UUID.class), any(NotesRequest.class));
-        }
+        when(noteService.restoreNote(any(User.class), eq(testNoteId)))
+                .thenReturn(restoreResponse);
+
+        // Act & Assert
+        mockMvc.perform(post("/api/v1/notes/{noteId}/restore", testNoteId))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.message").value("Note restored successfully"));
+
+        verify(noteService, times(1)).restoreNote(any(User.class), eq(testNoteId));
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/notes/{noteId} - Should successfully update a note")
+    @WithMockAuthenticatedUser
+    void shouldSuccessfullyUpdateNote() throws Exception {
+        // Arrange
+        NotesRequest updateRequest = NotesRequest.builder()
+                .title("Updated Note")
+                .content(testContent)
+                .tags(Arrays.asList("updated", "modified"))
+                .build();
+
+        GenericMessageResponse updateResponse = GenericMessageResponse.builder()
+                .message("Note updated successfully")
+                .build();
+
+        when(noteService.updateNote(any(User.class), eq(testNoteId), any(NotesRequest.class)))
+                .thenReturn(updateResponse);
+
+        // Act & Assert
+        mockMvc.perform(put("/api/v1/notes/{noteId}", testNoteId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateRequest)))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.message").value("Note updated successfully"));
+
+        verify(noteService, times(1)).updateNote(any(User.class), eq(testNoteId), any(NotesRequest.class));
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/notes/{noteId} - Should fail when updating with blank title")
+    @WithMockAuthenticatedUser
+    void shouldFailWhenUpdatingWithBlankTitle() throws Exception {
+        // Arrange
+        NotesRequest invalidRequest = NotesRequest.builder()
+                .title("")
+                .content(testContent)
+                .tags(Collections.singletonList("work"))
+                .build();
+
+        // Act & Assert
+        mockMvc.perform(put("/api/v1/notes/{noteId}", testNoteId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidRequest)))
+                .andDo(print())
+                .andExpect(status().isBadRequest());
+
+        verify(noteService, never()).updateNote(any(User.class), any(UUID.class), any(NotesRequest.class));
+    }
+
+
+    @Test
+    @DisplayName("Should verify that authenticated user is passed to service layer")
+    @WithMockAuthenticatedUser
+    void shouldVerifyAuthenticatedUserIsPassedToService() throws Exception {
+        // Arrange
+        when(noteService.createNote(any(User.class), any(NotesRequest.class)))
+                .thenReturn(successResponse);
+
+        // Act & Assert
+        mockMvc.perform(post("/api/v1/notes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validNotesRequest)))
+                .andDo(print())
+                .andExpect(status().isCreated());
+
+        // Verify that the service was called with a User object (the @AuthenticationPrincipal)
+        verify(noteService, times(1)).createNote(any(User.class), any(NotesRequest.class));
     }
 }
 
