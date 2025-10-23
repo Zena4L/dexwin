@@ -1,9 +1,9 @@
 package com.clement.dexwin.web;
 
-import com.clement.dexwin.domain.dtos.LoginRequestDto;
-import com.clement.dexwin.domain.dtos.SignedUpSucessResponse;
-import com.clement.dexwin.domain.dtos.signinResponse;
-import com.clement.dexwin.domain.dtos.SignupRequestDto;
+import com.clement.dexwin.domain.dtos.users.LoginRequestDto;
+import com.clement.dexwin.domain.dtos.users.SignedUpSucessResponse;
+import com.clement.dexwin.domain.dtos.users.signinResponse;
+import com.clement.dexwin.domain.dtos.users.SignupRequestDto;
 import com.clement.dexwin.domain.services.contracts.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;

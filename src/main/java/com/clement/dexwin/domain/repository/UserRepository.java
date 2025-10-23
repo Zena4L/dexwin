@@ -1,8 +1,8 @@
 package com.clement.dexwin.domain.repository;
 
-import com.clement.dexwin.domain.models.User;
-import com.clement.dexwin.domain.models.UserByEmail;
-import com.clement.dexwin.domain.models.UserListProjection;
+import com.clement.dexwin.domain.models.users.User;
+import com.clement.dexwin.domain.models.users.UserByEmail;
+import com.clement.dexwin.domain.models.users.UserListProjection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

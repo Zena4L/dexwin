@@ -1,6 +1,6 @@
 package com.clement.dexwin.web;
 
-import com.clement.dexwin.domain.models.UserListProjection;
+import com.clement.dexwin.domain.models.users.UserListProjection;
 import com.clement.dexwin.domain.services.contracts.UserManagement;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

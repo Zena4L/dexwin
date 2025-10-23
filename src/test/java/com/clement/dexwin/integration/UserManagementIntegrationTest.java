@@ -1,8 +1,8 @@
 package com.clement.dexwin.integration;
 
-import com.clement.dexwin.domain.models.Roles;
-import com.clement.dexwin.domain.models.User;
-import com.clement.dexwin.domain.models.UserListProjection;
+import com.clement.dexwin.domain.models.users.Roles;
+import com.clement.dexwin.domain.models.users.User;
+import com.clement.dexwin.domain.models.users.UserListProjection;
 import com.clement.dexwin.domain.repository.UserRepository;
 import com.clement.dexwin.domain.services.implementations.UserManagementImpl;
 import com.clement.dexwin.exceptions.BadRequestException;

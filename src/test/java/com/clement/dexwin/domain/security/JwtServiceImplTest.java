@@ -1,7 +1,7 @@
 package com.clement.dexwin.domain.security;
 
-import com.clement.dexwin.domain.models.Roles;
-import com.clement.dexwin.domain.models.User;
+import com.clement.dexwin.domain.models.users.Roles;
+import com.clement.dexwin.domain.models.users.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

@@ -1,6 +1,6 @@
 package com.clement.dexwin.domain.security;
 
-import com.clement.dexwin.domain.models.User;
+import com.clement.dexwin.domain.models.users.User;
 import com.clement.dexwin.domain.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 

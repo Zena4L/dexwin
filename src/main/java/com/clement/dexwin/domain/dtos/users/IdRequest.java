@@ -1,4 +1,4 @@
-package com.clement.dexwin.domain.dtos;
+package com.clement.dexwin.domain.dtos.users;
 
 import java.util.UUID;
 

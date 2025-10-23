@@ -1,6 +1,6 @@
-package com.clement.dexwin.domain.dtos;
+package com.clement.dexwin.domain.dtos.users;
 
-import com.clement.dexwin.domain.models.Roles;
+import com.clement.dexwin.domain.models.users.Roles;
 import lombok.Builder;
 
 @Builder

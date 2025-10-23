@@ -1,7 +1,6 @@
 package com.clement.dexwin.domain.services.contracts;
 
-import com.clement.dexwin.domain.dtos.IdRequest;
-import com.clement.dexwin.domain.models.UserListProjection;
+import com.clement.dexwin.domain.models.users.UserListProjection;
 import org.springframework.data.domain.Page;
 
 import java.util.UUID;

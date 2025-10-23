@@ -1,7 +1,7 @@
 package com.clement.dexwin.web;
 
 
-import com.clement.dexwin.domain.models.UserListProjection;
+import com.clement.dexwin.domain.models.users.UserListProjection;
 import com.clement.dexwin.domain.services.contracts.UserManagement;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

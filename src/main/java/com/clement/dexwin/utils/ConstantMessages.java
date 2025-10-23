@@ -17,6 +17,7 @@ public final class ConstantMessages {
     public static final String DEFAULT_PAGE_NUMBER = "0";
     public static final String DEFAULT_PAGE_SIZE = "10";
     public static final String INVALID_PAGE_NUMBER = "Page number can't be negative";
+    public static final String NOTESNOTBLANKORNULL = "Title and Content cannot be null or blank";
 
 
 }

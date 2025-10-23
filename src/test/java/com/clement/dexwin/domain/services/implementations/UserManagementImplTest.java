@@ -1,6 +1,6 @@
 package com.clement.dexwin.domain.services.implementations;
 
-import com.clement.dexwin.domain.models.UserListProjection;
+import com.clement.dexwin.domain.models.users.UserListProjection;
 import com.clement.dexwin.domain.repository.UserRepository;
 import com.clement.dexwin.exceptions.BadRequestException;
 import com.clement.dexwin.exceptions.NotFoundException;

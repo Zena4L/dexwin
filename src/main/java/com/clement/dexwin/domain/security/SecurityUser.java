@@ -1,6 +1,6 @@
 package com.clement.dexwin.domain.security;
 
-import com.clement.dexwin.domain.models.User;
+import com.clement.dexwin.domain.models.users.User;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;

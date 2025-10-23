@@ -1,7 +1,7 @@
 package com.clement.dexwin.utils;
 
-import com.clement.dexwin.domain.models.Roles;
-import com.clement.dexwin.domain.models.User;
+import com.clement.dexwin.domain.models.users.Roles;
+import com.clement.dexwin.domain.models.users.User;
 import com.clement.dexwin.domain.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

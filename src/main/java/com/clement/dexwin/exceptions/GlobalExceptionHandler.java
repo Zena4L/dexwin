@@ -33,7 +33,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
 
-    @ExceptionHandler({Exception.class})
+    @ExceptionHandler({Exception.class,GenericException.class})
     public ResponseEntity<Object> handleGenericException(Exception e) {
         return exceptionResponse(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
     }
@@ -50,6 +50,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<Object> handle403Exceptions(Exception e) {
         return exceptionResponse(HttpStatus.UNAUTHORIZED, e.getMessage());
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<Object> handle409Exceptions(Exception e) {
+        return exceptionResponse(HttpStatus.CONFLICT, e.getMessage());
     }
 
     @ExceptionHandler({DuplicateEmailException.class, BadRequestException.class})
