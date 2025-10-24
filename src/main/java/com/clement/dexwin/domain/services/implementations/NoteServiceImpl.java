@@ -75,18 +75,24 @@ public class NoteServiceImpl implements NoteService {
 
         Page<Note> notes = notesRepository.findAll(spec, pageRequest);
         return notes.map(note -> new NoteResponse(
+                note.getId(),
                 note.getTitle(),
                 deserializeFromJson(note.getContent()),
-                note.getTags()
+                note.getTags(),
+                note.getCreatedAt(),
+                note.getLastModifiedBy()
         ));
     }
 
     @Override
     public NoteResponse getNoteById(User user, UUID noteId) {
         return notesRepository.findNoteById(noteId).map(note -> new NoteResponse(
+                note.getId(),
                 note.getTitle(),
                 deserializeFromJson(note.getContent()),
-                note.getTags()
+                note.getTags(),
+                note.getCreatedAt(),
+                note.getLastModifiedBy()
         )).orElseThrow(() -> new BadRequestException("Note not found with id: " + noteId));
     }
 
