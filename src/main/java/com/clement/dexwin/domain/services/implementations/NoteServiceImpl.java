@@ -114,7 +114,8 @@ public class NoteServiceImpl implements NoteService {
                 .orElseThrow(() -> new BadRequestException("Note not found or already deleted"));
 
         note.setDeletedAt(Instant.now());
-        notesRepository.delete(note);
+        note.setDeleted(true);
+        notesRepository.save(note);
 
         log.info("Note with id {} soft deleted for user {}", noteId, user.getId());
         return new GenericMessageResponse("Note deleted successfully");
