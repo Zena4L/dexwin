@@ -1,5 +1,6 @@
 package com.clement.dexwin;
 
+import com.clement.dexwin.config.AppVariable;
 import com.clement.dexwin.config.RsaProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -11,7 +12,7 @@ import static org.springframework.data.web.config.EnableSpringDataWebSupport.Pag
 
 @SpringBootApplication
 @EnableSpringDataWebSupport(pageSerializationMode = VIA_DTO)
-@EnableConfigurationProperties(RsaProperties.class)
+@EnableConfigurationProperties({RsaProperties.class, AppVariable.class})
 public class DexwinApplication {
 
     public static void main(String[] args) {

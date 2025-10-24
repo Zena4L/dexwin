@@ -29,6 +29,8 @@ public record SignupRequestDto(
     @NotNull(message = LAST_NAME_NOT_NULL)
     @NotBlank(message = LAST_NAME_NOT_BLANK)
     String lastName,
+
+    @NotBlank(message = EMAIL_NOT_BLANK)
     @NotNull(message = EMAIL_NOT_NULL)
     @Email(message = EMAIL_NOT_BLANK)
     String email,

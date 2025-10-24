@@ -52,6 +52,7 @@ public class SecurityConfig {
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final RsaProperties rsa;
     private final UserRepository userRepository;
+    private final AppVariable appVariables;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -64,12 +65,11 @@ public class SecurityConfig {
                 cors -> cors.configurationSource(
                         request -> {
                             CorsConfiguration configuration = new CorsConfiguration();
-                            configuration.setAllowedOrigins(List.of("*"));
-                            configuration.setAllowedHeaders(List.of("*"));
+                            configuration.setAllowedOrigins(appVariables.allowedOrigins());
+                            configuration.setAllowedHeaders(appVariables.allowedHeaders());
                             configuration.setAllowCredentials(true);
                             configuration.setExposedHeaders(List.of("If-Match"));
-                            configuration.setAllowedMethods(
-                                    List.of("GET", "POST", "PUT", "PATCH", "DELETE"));
+                            configuration.setAllowedMethods(appVariables.allowedMethods());
                             return configuration;
                         }
                 )
