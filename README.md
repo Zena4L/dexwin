@@ -87,9 +87,9 @@ The app will start at: http://localhost:${SERVER_PORT:-8080}
 
 ### API Documentation
 
-Swagger UI: http://localhost:${SERVER_PORT:-8080}/swagger-ui.html
-
-OpenAPI JSON: http://localhost:${SERVER_PORT:-8080}/v3/api-docs
+- Swagger UI: http://localhost:${SERVER_PORT:-8080}/swagger-ui/index.html
+- OpenAPI JSON: http://localhost:${SERVER_PORT:-8080}/v3/api-docs
+- Note: If the app is deployed behind a proxy or with a custom context path, adjust the base URL accordingly.
 
 ### Running Tests
 
@@ -104,6 +104,8 @@ Create a runnable jar:
 mvn -DskipTests package
 ```
 The artifact will be under `target/`.
+
+
 
 ## Project Structure
 
@@ -140,8 +142,50 @@ Note: Exact paths may vary; check Swagger UI for authoritative documentation.
 - 409 Conflict during note update:
   - Another client modified the note. Reload the note and retry.
 
-## License
+## Run
 
+- Local (Dev):
+  - mvn spring-boot:run
+- Local (Jar):
+  - mvn -DskipTests package
+  - java -jar target/Dexwin-0.0.1-SNAPSHOT.jar
+- With Docker:
+  - docker build -t dexwin:local .
+  - docker run --rm -p 8080:8080 --env-file .env dexwin:local
+
+## Test
+
+- Run unit tests:
+  - mvn test
+- Generate coverage (JaCoCo):
+  - mvn test
+  - Then open target/site/jacoco/index.html in your browser for the coverage report.
+
+## Swagger/OpenAPI
+
+- Swagger UI: http://localhost:${SERVER_PORT:-8080}/swagger-ui/index.html
+- OpenAPI JSON: http://localhost:${SERVER_PORT:-8080}/v3/api-docs
+
+## Dockerfile
+
+A production-ready multi-stage Dockerfile is included at the project root. It builds the jar and runs it on a minimized JRE base image. See the Run section above for usage.
+
+## Flyway Scripts
+
+- Migrations live under: src/main/resources/db/migration
+- Naming convention: V<version>__<description>.sql (e.g., V1__init.sql)
+- Flyway runs automatically on application startup.
+
+## Decisions
+
+- Authentication: JWT-based stateless security via Spring Security.
+- Data store: PostgreSQL with JPA/Hibernate.
+- Migrations: Flyway for deterministic schema changes.
+- API Docs: springdoc-openapi with Swagger UI enabled.
+- Domain modeling: Notes content stored as JSON; soft-deletes implemented; optimistic locking enabled to handle concurrent updates.
+- Testing: JUnit + Mockito; code coverage via JaCoCo.
+
+## License
 This project is proprietary unless otherwise noted by the repository owner. Update this section if you intend to open-source it.
 
 
